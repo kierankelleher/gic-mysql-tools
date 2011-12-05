@@ -1,0 +1,528 @@
+# /etc/my.cnf config for a linux mysql server
+# ROLE: Primary master server, began life as a slave, initially a slave and then switched to master
+# Machine configuration:
+#	Centos 5.X
+#	MySQL 5.1.51 RHEL5 64bit RPM and InnoDB Plug-in.
+#       InnoDB Plugin lets us get 5.5 features in 5.1
+#	48GB RAM
+#	2-disk SAS 15K drives in RAID 1 (mirror) configuration for boot
+#	8-disk SAS 15K drives in RAID 10 ( 4 stripe x mirroring) configuration for data
+#   Using about 38GB of available memory for MySQL.
+#
+# NOTE: The mysql data is not stored on boot drive, so datadir, tmpdir, socket reflect this
+#
+# References
+# http://www.mysqlperformanceblog.com/2007/11/04/heikki-tuuri-answers-to-innodb-questions-part-ii/
+
+
+[mysql]
+prompt=(\\u@\\h from servername)\\ \\d>\\_
+
+[client]
+
+# Tell client apps where the socket is for local connections
+# in case of a custom location
+socket=/data/var/sockdir/mysql.sock
+
+[mysql_upgrade]
+# the mysql_upgrade command reads defaults from this section only, so we need to 
+# tell it our custom data locations 
+# Custom file location being used here
+datadir=/data/var/data
+tmpdir=/data/var/tmp
+
+[mysqld]
+# ======= BEGIN GLOBAL SETTINGS ===================================================
+# We always want mysqld to start as mysql user
+user = mysql
+
+# If set to 0, table names are stored as specified and comparisons are case
+# sensitive. If set to 1, table names are stored in lowercase on disk and
+# comparisons are not case sensitive. If set to 2, table names are stored as given
+# but compared in lowercase. This option also applies to database names and table
+# aliases. For additional information, see Section 8.2.2, “Identifier Case
+# Sensitivity”.
+# You should not set this variable to 0 if you are running MySQL on a system that
+# has case-insensitive file names (such as Windows or Mac OS X). If you set this
+# variable to 0 on such a system and access MyISAM tablenames using different
+# lettercases, index corruption may result. On Windows the default value is 1. On
+# Mac OS X, the default value is 2.
+# If you are using InnoDB tables, you should set this variable to 1 on all
+# platforms to force names to be converted to lowercase. Prior to MySQL Cluster
+# NDB 6.3.35, MySQL Cluster NDB 7.0.15, and MySQL Cluster NDB 7.1.4, this is also
+# true for tables using the NDB storage engine.
+# KK: We want setting of 1 for innodb and linux compatability
+# KK: Do not change this to 1 without first changing the actual table names to lower case first
+lower_case_table_names = 1
+
+# We have a custom datadir location with datadir on the RAID volume
+# Custom file location being used here
+datadir=/data/var/data
+
+# In Linux the socket is typically in the data dir
+# We can use a custom location and then use unix permissions on the dir
+# to restrict local logins to specific local users such as root, admin.
+# A good security option is to prevent root login over the network in
+# database privileges and make the sockdir mysql:mysql ownership only with permissions 770
+# in which case only the linux root can log into mysql as mysql root on a local connection.
+# mysql user must have ownership and read/write of the directory
+# Custom file location being used here
+socket=/data/var/sockdir/mysql.sock
+
+# If we want mysql to error rather than accept invalid data (auto truncating strings for example, auto defaults) with a warning
+# However this may break some non-WO apps that use this server.
+# Note InnoDB plugin with mysql 5.1 now has a strict option just for InnoDB tables, so
+# we can dictate to other app developers using other DBs that all InnoDB will be strict and
+# if they want to be sloppy, they can use MyISAM. Otherwise, fix their apps.
+# Note the mode can be enabled by a connection also
+# Turn this on for initial import at least so our tables are created without stupid defaults
+# If at all possible, turn this on for any new installation so we get everyone working strict from the beginning
+sql-mode = STRICT_ALL_TABLES
+
+# back_log is the number of connections the operating system can keep in
+# the listen queue, before the MySQL connection manager thread has
+# processed them. If you have a very high connection rate and experience
+# "connection refused" errors, you might need to increase this value.
+# Check your OS documentation for the maximum value of this parameter.
+# Attempting to set back_log higher than your operating system limit
+# will have no effect.
+back_log = 50
+
+# The maximum amount of concurrent sessions the MySQL server will
+# allow. One of these connections will be reserved for a user with
+# SUPER privileges to allow the administrator to login even if the
+# connection limit has been reached.
+max_connections = 201
+
+# This variable should be as big as the biggest BLOB value we plan to use
+max_allowed_packet = 21M
+
+# The size of the cache to hold the SQL statements for the binary log
+# during a transaction. If you often use big, multi-statement
+# transactions you can increase this value to get more performance. All
+# statements from transactions are buffered in the binary log cache and
+# are being written to the binary log at once after the COMMIT.  If the
+# transaction is larger than this value, temporary file on disk is used
+# instead.  This buffer is allocated per connection on first update
+# statement in transaction
+binlog_cache_size = 4M
+
+# Maximum allowed size for a single HEAP (in memory) table. This option
+# is a protection against the accidential creation of a very large HEAP
+# table which could otherwise use up all memory resources.
+max_heap_table_size = 512M
+
+# The number of open tables for all threads. Increasing this value
+# increases the number of file descriptors that mysqld requires.
+# Therefore you have to make sure to set the amount of open files
+# allowed to at least 4096 in the variable "open-files-limit" in
+# section [mysqld_safe]
+# Known as thread_open_cache after MySQL 5.1.3
+table_cache = 2048
+
+# Thread stack size to use. This amount of memory is always reserved at
+# connection time. MySQL itself usually needs no more than 64K of
+# memory, while if you use your own stack hungry UDF functions or your
+# OS requires more stack for some operations, you might need to set this
+# to a higher value.
+thread_stack = 512K
+
+# Sort buffer is used to perform sorts for some ORDER BY and GROUP BY
+# queries. If sorted data does not fit into the sort buffer, a disk
+# based merge sort is used instead - See the "Sort_merge_passes"
+# status variable. Allocated per thread if sort is needed.
+# sort_buffer_size = 8M
+sort_buffer_size = 64M
+
+# This buffer is used for the optimization of full JOINs (JOINs without
+# indexes). Such JOINs are very bad for performance in most cases
+# anyway, but setting this variable to a large value reduces the
+# performance impact. See the "Select_full_join" status variable for a
+# count of full JOINs. Allocated per thread if full join is found
+join_buffer_size = 128M
+
+# Number of threads to keep available for use
+# Not really important for our situation where we use applications with persistent connections
+# But since it is a dedicated MySQL server, let's decide to keep at least 8 alive
+thread_cache_size = 8
+
+# Query cache is used to cache SELECT results and later return them
+# without actual executing the same query once again. Having the query
+# cache enabled may result in significant speed improvements, if your
+# have a lot of identical queries and rarely changing tables. See the
+# "Qcache_lowmem_prunes" status variable to check if the current value
+# is high enough for your load.
+# Note: In case your tables change very often or if your queries are
+# textually different every time, the query cache may result in a
+# slowdown instead of a performance improvement.
+query_cache_size = 64M
+
+# Only cache result sets that are smaller than this limit. This is to
+# protect the query cache of a very large result set overwriting all
+# other query results.
+query_cache_limit = 2M
+
+# Turns on the query cache
+query_cache_type = 1
+
+# Set the default transaction isolation level. Levels available are:
+# READ-UNCOMMITTED, READ-COMMITTED, REPEATABLE-READ, SERIALIZABLE
+# Unusually, the variable in SHOW VARIABLES is spelled tx_isolation
+# and in the online docs is spelled transaction-isolation (hyphen instead of underscore)
+transaction_isolation = REPEATABLE-READ
+
+# Maximum size for internal (in-memory) temporary tables. If a table
+# grows larger than this value, it is automatically converted to disk
+# based table This limitation is for a single table. There can be many
+# of them.
+tmp_table_size = 256M
+
+# Try number of CPU's*2 for thread_concurrency
+# If we don't set this, mysqld defaults to about 10 indicating that this setting is unnecessary for modern fast machines
+# Update 10/15/2009 - this variable is ONLY applicable to Sun Solaris machines!
+#thread_concurrency = 2
+
+# Enable slow query logging. Since MySQL 5.1.12
+slow_query_log
+
+# Specify the slow query log file. Since MySQL 5.1.12
+# Custom file location being used here
+slow_query_log_file=/data/var/log/mysql/mysql_slow_query.log
+
+# Slow queries to be logged are those greater than n seconds
+long_query_time=2
+
+# New tables are innodb unless specified otherwise (Before MySQL 4.1.2 use default-table-type)
+default-storage-engine=innodb
+
+# The directory used by MySQL for storing temporary files. For example,
+# it is used to perform disk based large sorts, as well as for internal
+# and explicit temporary tables. It might be good to put it on a
+# swapfs/tmpfs filesystem, if you do not create very large temporary
+# files. Alternatively you can put it on dedicated disk. You can
+# specify multiple paths here by separating them by ";" - they will then
+# be used in a round-robin fashion.
+# IMPORTANT: For replication slave, the tmpdir must survive system reboots!
+# Custom file location being used here
+tmpdir = /data/var/tmp
+
+# SSL files to support SSL connections
+#ssl-ca=/data/var/ssl/ca.crt
+#ssl-cert=/data/var/ssl/server-cert.pem
+#ssl-key=/data/var/ssl/server-key.pem
+
+# Print warnings to the error log file.  If you have any problem with
+# MySQL you should enable logging of warnings and examine the error log
+# for possible explanations. 
+# log_warnings
+
+# ======= BINARY LOGGING ====================================================================
+# A requirement for replication master and point in time recovery of a backup
+# Custom file location being used here
+log-bin=/data/var/log/mysql/binary/binary-log
+
+# If you're using replication with chained slaves (A->B->C), you need to
+# enable this option on server B. It enables logging of updates done by
+# the slave thread into the slave's binary log.
+# Without this, slave thread statements are not logged to the binary log
+#log_slave_updates
+
+# ======= BEGIN REPLICATION SLAVE SETTINGS ===================================================
+# If this server is going to become a slave, then uncomment the commented out options here.
+# http://dev.mysql.com/doc/refman/5.1/en/replication-options.html
+
+# Unique server id (unique in a group of master and slave servers)
+server-id               = 3168
+
+# the name of the slave host if operating as a slave
+report-host=servername.local
+
+# allows only updates from slave threads and users with SUPER privilege
+# Enable this option if this server is operating as a slave to prevent accidental
+# modification by some app configured with wrong host connection
+#read-only
+ 
+# Some options to keep slave relay files host independent so they can be used to create new slaves
+# http://dev.mysql.com/doc/refman/5.1/en/replication-options.html
+relay-log = com.mycompany-relay-bin
+relay-log-index = com.mycompany-relay-bin.index
+
+
+# When the slow query log is enabled, this option enables logging for queries that have taken more 
+# than long_query_time seconds to execute on the slave. Since MySQL 5.1.21
+#log-slow-slave-statements
+
+# binary logging format - probably should be mixed, but let's leave it at default right now.
+# binlog_format=mixed
+
+# ======= GENERAL PERFORMANCE SETTINGS ===================================================
+
+# This is a buffer used for sequential table scans (I guess where an index
+# is not used for a search ... may help scans that create new indexes aswell)
+read_buffer_size = 64M
+
+# When reading rows in sorted order after a sort, the rows are read
+# through this buffer to avoid disk seeks. You can improve ORDER BY
+# performance a lot, if set this to a high value.
+# Allocated per thread, when needed.
+read_rnd_buffer_size = 64M
+
+
+
+###############################################
+# All MyISAM Specific Configuration here
+###############################################
+
+# Size of the Key Buffer, used to cache index blocks for MyISAM tables.
+# Do not set it larger than 30% of your available memory, as some memory
+# is also required by the OS to cache rows. Even if you're not using
+# MyISAM tables, you should still set it to 8-64M as it will also be
+# used for internal temporary disk tables.
+# Ideally key_buffer (aka key_buffer_size) should be as large as we can afford and 
+# ideally should be equal to the sum of all .MYI files' sizes.
+# This is one of the most important performance tuning variables for queries
+# on MyISAM tables that use indexes
+key_buffer_size = 512M
+
+# MyISAM uses special tree-like cache to make bulk inserts (that is,
+# INSERT ... SELECT, INSERT ... VALUES (...), (...), ..., and LOAD DATA
+# INFILE) faster. This variable limits the size of the cache tree in
+# bytes per thread. Setting it to 0 will disable this optimisation.  Do
+# not set it larger than "key_buffer_size" for optimal performance.
+# This buffer is allocated when a bulk insert is detected.
+bulk_insert_buffer_size = 64M
+
+# Quite large values are given here to support the huge zip+4 lat/lng database
+# This buffer is allocated when MySQL needs to rebuild the index in
+# REPAIR, OPTIMIZE, ALTER table statements as well as in LOAD DATA INFILE
+# into an empty table. It is allocated per thread so be careful with
+# large settings.
+myisam_sort_buffer_size = 64M
+
+# The maximum size of the temporary file MySQL is allowed to use while
+# recreating the index (during REPAIR, ALTER TABLE or LOAD DATA INFILE.
+# If the file-size would be bigger than this, the index will be created
+# through the key cache (which is slower).
+myisam_max_sort_file_size = 10G
+
+# If a table has more than one index, MyISAM can use more than one
+# thread to repair them by sorting in parallel. This makes sense if you
+# have multiple CPUs and plenty of memory.
+myisam_repair_threads = 2
+
+# Automatically check and repair not properly closed MyISAM tables.
+myisam_recover=BACKUP,FORCE
+
+###############################################
+# All Innodb Configuration here
+###############################################
+# InnoDB Plugin. These options are only needed to enable the plugin in 5.1
+# *** Upon upgrade to 5.5, remove this since the plugin becomes the 'built-in' innodb.
+# http://dev.mysql.com/doc/refman/5.1/en/replacing-builtin-innodb.html
+# http://dev.mysql.com/doc/innodb-plugin/1.0/en/innodb-plugin-introduction-restrictions.html
+# http://dev.mysql.com/doc/innodb-plugin/1.0/en/innodb-plugin-installation-configuration.html
+ignore-builtin-innodb
+plugin-load=innodb=ha_innodb_plugin.so;innodb_trx=ha_innodb_plugin.so;innodb_locks=ha_innodb_plugin.so;innodb_lock_waits=ha_innodb_plugin.so;innodb_cmp=ha_innodb_plugin.so;innodb_cmp_reset=ha_innodb_plugin.so;innodb_cmpmem=ha_innodb_plugin.so;innodb_cmpmem_reset=ha_innodb_plugin.so
+plugin_dir=/usr/lib64/mysql/plugin
+
+# Note that if we want to go back to built-in innodb, then we need to prefix
+# properties that are unknown by old innodb with 'loose_' to prevent a mysqld launch failure
+# or just comment them out
+
+# For replication, mysqldump and compatability with the built-in innodb, we will stick
+# with Antelope innodb format while using MySQL 5.1. We can consider the newer compressed
+# table format 'Barracuda' later or when we move to MySQL 5.5
+innodb_file_format=antelope
+
+# (InnoDB Plugin only) Whether InnoDB returns errors rather than warnings for exceptional
+# conditions. This is analogous to strict SQL mode. The default value is OFF.
+# This variable was added in MySQL 5.1.38.
+innodb_strict_mode = 1
+
+# WARNING: Once you use the InnoDB Plugin on a set of database files, care must be
+# taken to avoid crashes and corruptions when using those files with an earlier
+# version of InnoDB, as might happen by opening the database with MySQL when the
+# plugin is not installed. It is strongly recommended that you use a “slow
+# shutdown” (SET GLOBAL innodb_fast_shutdown=0) when stopping the MySQL server
+# when the InnoDB Plugin is enabled. This will ensure log files and other system
+# information written by the plugin will not cause problems when restarting or
+# reverting to a prior version of InnoDB.
+innodb_fast_shutdown=0
+
+# ---------- end innodb plugin 1.0.x configuration section --------------------------
+
+# http://dev.mysql.com/doc/refman/4.1/en/innodb-parameters.html
+
+# This next line enables innodb (is this needed anymore?)
+innodb
+
+# FROM The Release Notes for 5.0:
+# Incompatible change: As of MySQL 5.0.13, InnoDB rolls back only the last statement on a transaction 
+# timeout. In MySQL 5.0.32, a new option, --innodb_rollback_on_timeout, causes InnoDB to abort and roll 
+# back the entire transaction if a transaction timeout occurs (the same behavior as in MySQL 4.1).
+innodb_rollback_on_timeout
+
+# Additional memory pool that is used by InnoDB to store metadata
+# information.  If InnoDB requires more memory for this purpose it will
+# start to allocate it from the OS.  As this is fast enough on most
+# recent operating systems, you normally do not need to change this
+# value. SHOW INNODB STATUS will display the current amount used.
+innodb_additional_mem_pool_size = 16M
+
+## CRITICAL PERFORMANCE OPTION
+# http://www.mysqlperformanceblog.com/2007/11/03/choosing-innodb_buffer_pool_size/
+## Set this big ~50% available memory on dedicated server for best InnoDB performance
+# InnoDB, unlike MyISAM, uses a buffer pool to cache both indexes and
+# row data. The bigger you set this the less disk I/O is needed to
+# access data in tables. On a dedicated database server you may set this
+# parameter up to 80% of the machine physical memory size. Do not set it
+# too large, though, because competition of the physical memory may
+# cause paging in the operating system.  Note that on 32bit systems you
+# might be limited to 2-3.5G of user level memory per process, so do not
+# set it too high.
+# We have 48 GB of RAM on this server, but we are running some database maintenance apps on it too
+# and the entire data size is on 26GB, so we are good here with 30G setting.
+innodb_buffer_pool_size = 30G
+
+# The increment size (in MB) for extending the size of an auto-extending tablespace file when it becomes full. The default value is 8.
+# Don't increase this more that 64 MB if using innodb_file_per_table (recommended anyway)
+innodb_autoextend_increment = 64
+
+#innodb_data_file_path = ibdata1:10M:autoextend
+# Custom path in use here
+innodb_data_home_dir = /data/var/data
+
+# Number of IO threads to use for async IO operations. This value is
+# hardcoded to 4 on Unix, but on Windows disk I/O may benefit from a
+# larger number.
+# innodb_file_io_threads = 4
+
+# If you run into InnoDB tablespace corruption, setting this to a nonzero
+# value will likely help you to dump your tables. Start from value 1 and
+# increase it until you're able to dump the table successfully.
+#innodb_force_recovery=1
+
+# http://dev.mysql.com/doc/innodb-plugin/1.0/en/innodb-performance-thread_concurrency.html
+# KK: For plain innodb in 5.1 and below, 8 is the default and the recommended value is
+# cum cpus X 2 + num disks. So 12-core + 8-disk RAID would be value of 32.
+# However for Innodb plugin in 5.1 and in MySQL 5.5 and above
+# it may be best to initially disable this limit by setting the value to zero
+# or let the innodb_plugin default prevail, which is 0 anyway
+# http://blogs.sun.com/allanp/entry/tuning_mysql_on_linux
+#innodb_thread_concurrency = 32
+
+# http://code.openark.org/blog/mysql/reasons-to-use-innodb_file_per_table
+innodb_file_per_table
+
+# For the greatest possible durability and consistency in a replication setup using InnoDB with transactions
+# masters in replication setup should use the following 3 params with settings as show if applicable
+# If set to 1, InnoDB will flush (fsync) the transaction logs to the
+# disk at each commit, which offers full ACID behavior. If you are
+# willing to compromise this safety, and you are running small
+# transactions, you may set this to 0 or 2 to reduce disk I/O to the
+# logs. Value 0 means that the log is only written to the log file and
+# the log file flushed to disk approximately once per second. Value 2
+# means the log is written to the log file at each commit, but the log
+# file is only flushed to disk approximately once per second.
+# We have RAID with 512MB cache and battery backup, set this to most reliable setting
+innodb_flush_log_at_trx_commit = 1
+
+# The size of the buffer InnoDB uses for buffering log data. As soon as
+# it is full, InnoDB will have to flush it to disk. As it is flushed
+# once per second anyway, it does not make sense to have it very large
+# (even with long transactions). 
+innodb_log_buffer_size = 8M
+
+# The size in bytes of each log file in a log group. The combined size of log 
+# files must be less than 4GB. The default value is 5MB. Sensible values range 
+# from 1MB to 1/N-th of the size of the buffer pool, where N is the number of log 
+# files in the group. The larger the value, the less checkpoint flush activity 
+# is needed in the buffer pool, saving disk I/O. But larger log files also mean 
+# that recovery is slower in case of a crash.
+innodb_log_file_size = 1024M
+
+# Total number of files in the log group. A value of 2-3 is usually good
+# enough. 2 is recommended.
+innodb_log_files_in_group = 2
+
+# The flush method InnoDB will use for Log. The tablespace always uses
+# doublewrite flush logic. The default value is "fdatasync", another
+# option is "O_DSYNC".
+# http://www.mysqlperformanceblog.com/2007/11/03/choosing-innodb_buffer_pool_size/
+# Eliminate Double Buffering – This is again very important for buffer pool size
+# choice. You do not want OS to cache what Innodb is caching already. Innodb cache
+# is more efficient compared to OS cache because there is no copying, due to
+# adaptive hash indexes, ability to buffer writes and number of other factors so
+# you just want to make your OS to give a way to Innodb. Note it is not enough to
+# block OS from swapping – as I already mentioned the OS cache will be needed for
+# other things and if you will not make Innodb to bypass OS buffering Innodb
+# TableSpace IO will wipe out cache because it typically makes most of the IO on
+# the system. On Windows you do not need to do anything. On Linux, FreeBSD,
+# Solaris you need to set innodb_flush_method=O_DIRECT. On other Operating Systems
+# you may be able to select it on OS level but make sure to do it. There is a
+# small niche case when it hurts – when you do not have RAID with BBU and your
+# workload is very write intensive but there are always exceptions.
+innodb_flush_method=O_DIRECT
+
+# Maximum allowed percentage of dirty pages in the InnoDB buffer pool.
+# If it is reached, InnoDB will start flushing them out agressively to
+# not run out of clean pages at all. This is a soft limit, not
+# guaranteed to be held.
+innodb_max_dirty_pages_pct = 90
+
+# If the value of this variable is greater than 0, the MySQL server synchronizes
+# its binary log to disk (using fdatasync()) after every sync_binlog writes to the
+# binary log. There is one write to the binary log per statement if autocommit is
+# enabled, and one write per transaction otherwise. The default value of
+# sync_binlog is 0, which does no synchronizing to disk. A value of 1 is the
+# safest choice, because in the event of a crash you lose at most one statement or
+# transaction from the binary log. However, it is also the slowest choice (unless
+# the disk has a battery-backed cache, which makes synchronization very fast).
+# If the value of sync_binlog is 0 (the default), no extra flushing is done. The
+# server relies on the operating system to flush the file contents occasionally as
+# for any other file.
+# KK - definitely use value of '1' for replication durability and reliability.
+# and the fact that we have battery-backed RAID cache
+sync_binlog=1
+
+# Obsolete from 5.0.3 onwards
+#innodb_safe_binlog
+
+
+# How long an InnoDB transaction should wait for a lock to be granted
+# before being rolled back. InnoDB automatically detects transaction
+# deadlocks in its own lock table and rolls back the transaction. If you
+# use the LOCK TABLES command, or other transaction-safe storage engines
+# than InnoDB in the same transaction, then a deadlock may arise which
+# InnoDB cannot notice. In cases like this the timeout is useful to
+# resolve the situation.
+innodb_lock_wait_timeout = 50
+
+# Set this when we have non-standard file locations
+innodb_log_group_home_dir = /data/var/data
+
+
+[mysqldump]
+quick
+#max_allowed_packet = 16M
+
+[isamchk]
+key_buffer = 512M
+sort_buffer_size = 512M
+read_buffer = 8M
+write_buffer = 8M
+
+[myisamchk]
+key_buffer = 512M
+sort_buffer_size = 512M
+read_buffer = 8M
+write_buffer = 8M
+
+[mysqlhotcopy]
+interactive-timeout
+
+[mysqld_safe]
+# Increase the amount of open files allowed per process. Warning: Make
+# sure you have set the global system limit high enough! The high value
+# is required for a large number of opened tables
+open-files-limit = 8192

@@ -37,7 +37,7 @@ So How Do I Pick a Configuration File?
         *   For example:
             *   `M512_innodb_mac_5.1_my.cnf` = MySQL 5.1 using *about* 512MB of memory 
                 on Mac OS X and primarily using innodb storage engine.
-            *   `G038_innodb_linux_5.1_my.cnf` = MySQL 5.1 using *about* 38MB of memory 
+            *   `G038_innodb_linux_5.1_my.cnf` = MySQL 5.1 using *about* 38GB of memory 
                 on Linux and primarily using innodb storage engine.
 2.  Install the file and get to work.
 

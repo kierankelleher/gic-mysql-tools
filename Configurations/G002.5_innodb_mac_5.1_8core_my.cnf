@@ -92,7 +92,8 @@ tmp_table_size = 64M
 # Log more information in the slow query log. Normally it is good to
 # have this turned on. This will enable logging of queries that are not
 # using indexes in addition to long running queries.
-log_long_format
+# Formerly this was log-long-format, which has been removed in 5.5
+log-queries-not-using-indexes
 
 # Don't listen on a TCP/IP port at all. This can be a security enhancement,
 # if all processes that need to connect to mysqld run on the same host.

@@ -177,6 +177,12 @@ transaction_isolation = REPEATABLE-READ
 # of them.
 tmp_table_size = 256M
 
+# Log more information in the slow query log. Normally it is good to
+# have this turned on. This will enable logging of queries that are not
+# using indexes in addition to long running queries.
+# Formerly this was log-long-format, which has been removed in 5.5
+log-queries-not-using-indexes
+
 # Try number of CPU's*2 for thread_concurrency
 # If we don't set this, mysqld defaults to about 10 indicating that this setting is unnecessary for modern fast machines
 # Update 10/15/2009 - this variable is ONLY applicable to Sun Solaris machines!

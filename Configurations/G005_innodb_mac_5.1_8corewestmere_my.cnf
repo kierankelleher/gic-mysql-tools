@@ -16,7 +16,7 @@ tmpdir=/Volumes/SSD120/mysql/tmp
 [mysqld]
 #log-bin		= /var/db/repl/binary-log
 #server-id	= 118
-default-table-type=innodb
+default-storage-engine=innodb
 
 # Turn on MySQL query logging
 # For development we use tmp dir

@@ -89,11 +89,13 @@ transaction_isolation = REPEATABLE-READ
 # of them.
 tmp_table_size = 64M
 
-# Log more information in the slow query log. Normally it is good to
-# have this turned on. This will enable logging of queries that are not
-# using indexes in addition to long running queries.
-# Formerly this was log-long-format, which has been removed in 5.5
-log-queries-not-using-indexes
+# If you are using this option with the slow query log enabled, queries
+# that are expected to retrieve all rows are logged. See Section 5.2.5, 
+# “The Slow Query Log”. This option does not necessarily mean that no 
+# index is used. For example, a query that uses a full index scan uses 
+# an index but would be logged because the index would not limit the number of rows.
+# Note log-long-format (log_long_format), which had a similar effect, is removed from 5.5
+#log-queries-not-using-indexes
 
 # Don't listen on a TCP/IP port at all. This can be a security enhancement,
 # if all processes that need to connect to mysqld run on the same host.

@@ -156,12 +156,6 @@ myisam_sort_buffer_size = 32M
 # through the key cache (which is slower).
 myisam_max_sort_file_size = 2G
 
-# If the temporary file used for fast index creation would be bigger
-# than using the key cache by the amount specified here, then prefer the
-# key cache method.  This is mainly used to force long character keys in
-# large tables to use the slower key cache method to create the index.
-myisam_max_extra_sort_file_size = 2G
-
 # If a table has more than one index, MyISAM can use more than one
 # thread to repair them by sorting in parallel. This makes sense if you
 # have multiple CPUs and plenty of memory.

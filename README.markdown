@@ -64,7 +64,7 @@ Refer to [this article](http://dev.mysql.com/doc/refman/5.0/en/innodb-data-log-r
 *   Start mysqld:
 	*   `$ sudo echo`
 	*   `$ sudo mysqld_safe &`
-* If
+* If mysql fails to start, check the error log (file ending in .err in your mysql data directory) for troubleshooting information. 
 	
 How Much Memory do I Need?
 --------------------------
